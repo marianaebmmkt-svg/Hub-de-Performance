@@ -17,17 +17,21 @@ const App: React.FC = () => {
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   
-  // Estados Persistentes (Tokens e Status)
+  // Detecção robusta de chaves de Service Account (Vite env ou Process env)
+  // Added cast to any for import.meta to resolve Property 'env' does not exist error
+  const hasAdsKey = !!((import.meta as any).env?.VITE_GOOGLE_ADS_ACCESS_TOKEN || process.env?.VITE_GOOGLE_ADS_ACCESS_TOKEN);
+  const hasGA4Key = !!((import.meta as any).env?.VITE_GA4_ACCESS_TOKEN || process.env?.VITE_GA4_ACCESS_TOKEN);
+
   const [connections, setConnections] = useLocalStorage<ConnectionStatus[]>('mari_hub_connections', [
-    { provider: 'google_ads', isConnected: false },
+    { provider: 'google_ads', isConnected: hasAdsKey },
     { provider: 'meta_ads', isConnected: false },
-    { provider: 'ga4', isConnected: false },
+    { provider: 'ga4', isConnected: hasGA4Key },
     { provider: 'gsc', isConnected: false },
   ]);
 
   const [persistentRange, setPersistentRange] = useLocalStorage<DateRange>('mari_hub_daterange', {
-    label: 'Últimos 30 dias',
-    start: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
+    label: 'Últimos 7 dias',
+    start: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
     end: new Date(),
     compare: false
   });
@@ -50,12 +54,11 @@ const App: React.FC = () => {
           } 
         : c
     ));
-    // Se conectou, volta para o dashboard para ver os dados reais
     setActiveView(ViewType.DASHBOARD);
   };
 
   const handleDisconnect = (providerId: string) => {
-    if (window.confirm(`Tem certeza que deseja remover o acesso do ${providerId}?`)) {
+    if (window.confirm(`Deseja interromper a sincronização Cloud do ${providerId}?`)) {
       setConnections(prev => prev.map(c => 
         c.provider === providerId ? { ...c, isConnected: false, accessToken: undefined, accountId: undefined, lastSync: undefined } : c
       ));
@@ -103,7 +106,7 @@ const App: React.FC = () => {
       <div className={`fixed top-4 right-4 z-[60] px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest transition-all duration-500 shadow-lg ${
         isSyncing ? 'bg-indigo-600 text-white scale-110' : 'bg-emerald-500 text-white opacity-0 scale-90 translate-y-[-20px]'
       }`}>
-        {isSyncing ? '☁️ Sincronizando APIs...' : '✅ Dados Atualizados'}
+        {isSyncing ? '☁️ Cloud Sync Active...' : '✅ Online'}
       </div>
 
       <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden">

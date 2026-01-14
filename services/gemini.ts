@@ -12,8 +12,9 @@ export const getChatResponse = async (userMessage: string, history: any[]) => {
     client: "Hub de Performance da Mari"
   };
 
+  // Upgraded to gemini-3-pro-preview for complex strategic analysis as per guidelines
   const response = await ai.models.generateContent({
-    model: "gemini-3-flash-preview",
+    model: "gemini-3-pro-preview",
     contents: [
       ...history,
       { role: "user", parts: [{ text: userMessage }] }
@@ -33,8 +34,9 @@ export const getChatResponse = async (userMessage: string, history: any[]) => {
 export const getMarketInsights = async (niche: string = "empréstimo consignado e crédito no Brasil") => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   try {
+    // Upgraded to gemini-3-pro-preview for advanced reasoning and market analysis
     const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
+      model: "gemini-3-pro-preview",
       contents: `Analise as tendências atuais de marketing digital para o nicho de ${niche} para o 'Hub de Performance da Mari'. 
       Foque em CPC médio e volume de busca atual.`,
       config: {

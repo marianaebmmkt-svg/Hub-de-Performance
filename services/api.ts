@@ -1,20 +1,23 @@
 
 import { PerformanceData, DateRange, ConnectionStatus } from '../types';
-import { MOCK_PERFORMANCE } from '../constants';
 
 const formatDate = (date: Date) => {
   const d = new Date(date);
   return d.toISOString().split('T')[0];
 };
 
+const getEnvVar = (key: string): string => {
+  // Added cast to any for import.meta to resolve property access error in TypeScript
+  return ((import.meta as any).env?.[key] as string) || (process.env?.[key] as string) || '';
+};
+
 /**
- * GOOGLE ADS API - Extração de métricas reais
+ * GOOGLE ADS API - Extração Real via GAQL
  */
 export const fetchAdsRealData = async (token: string, customerId: string, range: DateRange) => {
-  // Limpa o ID do cliente (remove hífens)
   const customer = customerId.replace(/-/g, '');
+  const devToken = getEnvVar('VITE_GOOGLE_ADS_DEVELOPER_TOKEN');
   
-  // Query GAQL para buscar métricas vitais
   const query = `
     SELECT 
       metrics.cost_micros, 
@@ -32,24 +35,31 @@ export const fetchAdsRealData = async (token: string, customerId: string, range:
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-        // developer-token é necessário em apps aprovados, mas o Google Ads API permite chamadas de teste
+        'Content-Type': 'application/json',
+        'developer-token': devToken || ''
       },
       body: JSON.stringify({ query })
     });
 
-    if (response.status === 401 || response.status === 403) throw new Error('AUTH_EXPIRED');
-    if (!response.ok) return null;
+    const result = await response.json();
+
+    if (!response.ok) {
+      if (response.status === 401) throw new Error('AUTH_EXPIRED');
+      if (result.error?.details?.some((d: any) => d.error_code?.authorization_error === 'DEVELOPER_TOKEN_NOT_APPROVED')) {
+        throw new Error('DEV_TOKEN_UNAUTHORIZED');
+      }
+      throw new Error('ADS_API_ERROR');
+    }
     
-    return await response.json();
+    return result;
   } catch (e) {
     console.error("Ads API Error:", e);
-    return null;
+    throw e;
   }
 };
 
 /**
- * GA4 DATA API - Extração de conversões de leads
+ * GA4 DATA API - Extração Real
  */
 export const fetchGA4RealData = async (token: string, propertyId: string, range: DateRange) => {
   try {
@@ -71,9 +81,7 @@ export const fetchGA4RealData = async (token: string, propertyId: string, range:
       })
     });
 
-    if (response.status === 401) throw new Error('AUTH_EXPIRED');
     if (!response.ok) return null;
-
     return await response.json();
   } catch (e) {
     console.error("GA4 API Error:", e);
@@ -82,26 +90,28 @@ export const fetchGA4RealData = async (token: string, propertyId: string, range:
 };
 
 /**
- * MOTOR DE ATUALIZAÇÃO DO DASHBOARD
+ * ENGINE DE SINCRONIZAÇÃO OAUTH2
  */
 export const fetchPerformanceData = async (accountId: string, dateRange: DateRange): Promise<PerformanceData[]> => {
   const stored = localStorage.getItem('mari_hub_connections');
   const connections: ConnectionStatus[] = stored ? JSON.parse(stored) : [];
   
-  const ads = connections.find(c => c.provider === 'google_ads' && c.isConnected);
-  const ga4 = connections.find(c => c.provider === 'ga4' && c.isConnected);
+  const adsConn = connections.find(c => c.provider === 'google_ads' && c.isConnected);
+  const ga4Conn = connections.find(c => c.provider === 'ga4' && c.isConnected);
 
-  // Se não houver tokens ou conexão, mantemos o Mock para não quebrar a UI da Mari
-  if (!ads?.accessToken && !ga4?.accessToken) {
-    return MOCK_PERFORMANCE;
+  if (!adsConn?.accessToken && !ga4Conn?.accessToken) {
+    throw new Error('NO_CONNECTIONS');
   }
 
   const results: PerformanceData[] = [];
 
   try {
-    // Processa dados do Google Ads se disponível
-    if (ads?.accessToken && ads?.accountId) {
-      const adsData = await fetchAdsRealData(ads.accessToken, ads.accountId, dateRange);
+    if (adsConn?.accessToken) {
+      const adsData = await fetchAdsRealData(
+        adsConn.accessToken, 
+        getEnvVar('VITE_GOOGLE_ADS_CUSTOMER_ID') || adsConn.accountId || '6316307698', 
+        dateRange
+      );
       if (adsData?.results) {
         adsData.results.forEach((row: any) => {
           results.push({
@@ -121,9 +131,12 @@ export const fetchPerformanceData = async (accountId: string, dateRange: DateRan
       }
     }
 
-    // Processa dados do GA4 para atribuição de leads
-    if (ga4?.accessToken && ga4?.accountId) {
-      const ga4Data = await fetchGA4RealData(ga4.accessToken, ga4.accountId, dateRange);
+    if (ga4Conn?.accessToken) {
+      const ga4Data = await fetchGA4RealData(
+        ga4Conn.accessToken, 
+        getEnvVar('VITE_GA4_PROPERTY_ID') || ga4Conn.accountId || '375210574', 
+        dateRange
+      );
       if (ga4Data?.rows) {
         ga4Data.rows.forEach((row: any) => {
           results.push({
@@ -144,11 +157,9 @@ export const fetchPerformanceData = async (accountId: string, dateRange: DateRan
       }
     }
 
-    // Se as APIs falharem em retornar dados úteis, retornamos o Mock como fallback seguro
-    return results.length > 0 ? results : MOCK_PERFORMANCE;
-    
+    return results;
   } catch (error: any) {
-    if (error.message === 'AUTH_EXPIRED') throw error;
-    return MOCK_PERFORMANCE;
+    console.error("Critical API Sync Error:", error);
+    throw error;
   }
 };

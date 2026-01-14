@@ -1,19 +1,20 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { DateRange } from '../types';
 
 interface DateFilterProps {
+  initialRange: DateRange;
   onFilterChange: (range: DateRange) => void;
 }
 
-const DateFilter: React.FC<DateFilterProps> = ({ onFilterChange }) => {
+const DateFilter: React.FC<DateFilterProps> = ({ initialRange, onFilterChange }) => {
   const [isOpen, setIsOpen] = useState(false);
-  const [currentRange, setCurrentRange] = useState<DateRange>({
-    label: 'Últimos 30 dias',
-    start: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
-    end: new Date(),
-    compare: false
-  });
+  const [currentRange, setCurrentRange] = useState<DateRange>(initialRange);
+
+  // Sincroniza estado interno se o inicial mudar (ex: carregando do localStorage)
+  useEffect(() => {
+    setCurrentRange(initialRange);
+  }, [initialRange]);
 
   const presets = [
     { label: 'Últimos 7 dias', days: 7 },

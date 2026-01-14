@@ -5,12 +5,12 @@ import { COLORS } from '../constants';
 
 interface AIChatSidebarProps {
   onClose: () => void;
-  currentRange?: any; // Recebe o contexto do filtro atual
+  currentRange?: any; 
 }
 
 const AIChatSidebar: React.FC<AIChatSidebarProps> = ({ onClose, currentRange }) => {
   const [messages, setMessages] = useState<{ role: 'user' | 'model'; text: string }[]>([
-    { role: 'model', text: 'Olá! Sou sua analista Mari AI. Estou pronta para analisar seus dados de performance. O que deseja saber sobre os resultados atuais?' }
+    { role: 'model', text: 'Olá! Sou a Mari AI. Posso te ajudar a entender as diferenças de conversão entre suas campanhas pagas e o tráfego orgânico. O que deseja analisar?' }
   ]);
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
@@ -36,13 +36,15 @@ const AIChatSidebar: React.FC<AIChatSidebarProps> = ({ onClose, currentRange }) 
         parts: [{ text: m.text }] 
       }));
       
-      // Adiciona contexto do filtro atual no envio
-      const contextAugmentedMsg = `[Filtro Ativo: ${currentRange?.label || 'Período Atual'}${currentRange?.compare ? ' com Comparação Ativa' : ''}] ${userMsg}`;
+      const contextAugmentedMsg = `
+      [Contexto de Atribuição: Considere dados de GTM (Formulários), GA4 (Engajamento) e Search Console (Orgânico).
+      Filtro: ${currentRange?.label || 'Período Atual'}]
+      Pergunta do Usuário: ${userMsg}`;
       
       const aiResponse = await getChatResponse(contextAugmentedMsg, history);
       setMessages(prev => [...prev, { role: 'model', text: aiResponse || 'Sem resposta no momento.' }]);
     } catch (error) {
-      setMessages(prev => [...prev, { role: 'model', text: 'Desculpe, tive um erro ao processar sua análise.' }]);
+      setMessages(prev => [...prev, { role: 'model', text: 'Desculpe, tive um erro ao processar sua análise estratégica.' }]);
     } finally {
       setIsTyping(false);
     }
@@ -57,7 +59,7 @@ const AIChatSidebar: React.FC<AIChatSidebarProps> = ({ onClose, currentRange }) 
           </div>
           <div>
             <h3 className="font-bold text-sm tracking-tight">Mari AI Analista</h3>
-            <p className="text-[9px] text-slate-400 uppercase font-bold tracking-widest">BI Intelligence</p>
+            <p className="text-[9px] text-slate-400 uppercase font-bold tracking-widest">Atribuição Cross-Channel</p>
           </div>
         </div>
         <button onClick={onClose} className="text-slate-400 hover:text-white transition-colors">✕</button>
@@ -99,7 +101,7 @@ const AIChatSidebar: React.FC<AIChatSidebarProps> = ({ onClose, currentRange }) 
                 handleSend();
               }
             }}
-            placeholder="Como variou o CPA comparado ao mês passado?"
+            placeholder="Qual canal tem o melhor CPL hoje?"
             className="w-full p-3 pr-12 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none max-h-32 min-h-[44px] overflow-hidden bg-white shadow-inner"
             rows={1}
           />

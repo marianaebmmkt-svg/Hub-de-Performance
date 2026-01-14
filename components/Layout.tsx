@@ -26,6 +26,7 @@ const Layout: React.FC<LayoutProps> = ({
     { id: ViewType.META_ADS, label: 'Meta Ads', icon: '📱' },
     { id: ViewType.SEARCH_CONSOLE, label: 'SEO & Search', icon: '🔍' },
     { id: ViewType.ANALYTICS, label: 'Analytics', icon: '📈' },
+    { id: ViewType.CONNECTIONS, label: 'Integrações', icon: '🔌' },
     { id: ViewType.LEAD_TOOLS, label: 'Ferramentas', icon: '⚡' },
     { id: ViewType.INSIGHTS, label: 'Insights AI', icon: '✨' },
     { id: ViewType.ADMIN, label: 'Gestão de Acessos', icon: '👤' },

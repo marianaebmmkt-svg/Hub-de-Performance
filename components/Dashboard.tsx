@@ -2,15 +2,22 @@
 import React, { useState, useEffect } from 'react';
 import { 
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
-  AreaChart, Area, BarChart, Bar, Cell 
+  AreaChart, Area, BarChart, Bar, Cell, Legend
 } from 'recharts';
-import { ACTIONS_LOG, COLORS } from '../constants';
-import { MetricCard, PerformanceData, DateRange } from '../types';
+import { ACTIONS_LOG, COLORS, MOCK_TOP_PAGES } from '../constants';
+import { MetricCard, PerformanceData, DateRange, ViewType } from '../types';
 import { fetchPerformanceData } from '../services/api';
 import DateFilter from './DateFilter';
+import FormPerformance from './FormPerformance';
 
-const Metric: React.FC<MetricCard & { showCompare?: boolean }> = ({ label, value, change, suffix = '', showCompare, previousValue }) => (
-  <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm transition-all hover:shadow-md">
+interface DashboardProps {
+  persistentRange: DateRange;
+  onRangeChange: (range: DateRange) => void;
+  onViewChange?: (view: ViewType) => void;
+}
+
+const Metric: React.FC<MetricCard & { showCompare?: boolean; color?: string }> = ({ label, value, change, suffix = '', showCompare, previousValue, color = 'bg-white' }) => (
+  <div className={`${color} p-6 rounded-xl border border-slate-200 shadow-sm transition-all hover:shadow-md`}>
     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">{label}</p>
     <div className="flex items-baseline space-x-2">
       <h3 className="text-2xl font-bold text-slate-900">{value}{suffix}</h3>
@@ -26,57 +33,65 @@ const Metric: React.FC<MetricCard & { showCompare?: boolean }> = ({ label, value
   </div>
 );
 
-const CustomTooltip = ({ active, payload, label }: any) => {
-  if (active && payload && payload.length) {
-    const data = payload[0].payload;
-    return (
-      <div className="bg-white p-4 border border-slate-200 shadow-xl rounded-lg">
-        <p className="text-sm font-bold mb-2">{label}</p>
-        {payload.map((p: any) => (
-          <div key={p.name} className="flex justify-between space-x-4 text-xs mb-1">
-            <span style={{ color: p.color }} className="font-medium">{p.name}:</span>
-            <span className="font-bold text-slate-900">{p.value.toLocaleString()}</span>
-          </div>
-        ))}
-        {data.event && (
-          <div className="mt-2 pt-2 border-t border-slate-100">
-            <p className="text-[10px] font-bold text-amber-600 uppercase">Marco:</p>
-            <p className="text-xs italic text-slate-600">{data.event}</p>
-          </div>
-        )}
-      </div>
-    );
-  }
-  return null;
-};
-
-const Dashboard: React.FC = () => {
+const Dashboard: React.FC<DashboardProps> = ({ persistentRange, onRangeChange, onViewChange }) => {
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<PerformanceData[]>([]);
-  const [range, setRange] = useState<DateRange>({
-    label: 'Últimos 30 dias',
-    start: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
-    end: new Date(),
-    compare: false
-  });
 
   useEffect(() => {
     const loadData = async () => {
       setLoading(true);
-      const result = await fetchPerformanceData('all', range);
-      setData(result);
-      setLoading(false);
+      setError(null);
+      try {
+        const result = await fetchPerformanceData('all', persistentRange);
+        setData(result);
+      } catch (err: any) {
+        if (err.message === 'AUTH_EXPIRED') {
+          setError('Sua conexão com o Google expirou.');
+        } else {
+          setError('Ocorreu um erro ao buscar dados das APIs.');
+        }
+      } finally {
+        setLoading(false);
+      }
     };
     loadData();
-  }, [range]);
+  }, [persistentRange]);
+
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center h-[60vh] text-center space-y-6 animate-in fade-in zoom-in-95">
+        <div className="w-20 h-20 bg-rose-50 rounded-full flex items-center justify-center text-3xl shadow-inner">⚠️</div>
+        <div>
+          <h2 className="text-xl font-bold text-slate-800">{error}</h2>
+          <p className="text-slate-500 max-w-md mx-auto mt-2">
+            O acesso aos dados reais foi interrompido. Mari, você precisa renovar as permissões de acesso nas configurações de integração.
+          </p>
+        </div>
+        <button 
+          onClick={() => onViewChange?.(ViewType.CONNECTIONS)}
+          className="px-8 py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 shadow-lg shadow-indigo-200 transition-all hover:scale-105 active:scale-95"
+        >
+          Reconectar Contas Oficiais
+        </button>
+      </div>
+    );
+  }
+
+  // Atribuição Simética para o Dashboard
+  const attributionData = [
+    { channel: 'Pago (Ads/Meta)', leads: 850, cost: 32000, cpl: 37.64, color: COLORS.paid },
+    { channel: 'Orgânico (SEO)', leads: 320, cost: 4500, cpl: 14.06, color: COLORS.organic },
+    { channel: 'Direto', leads: 70, cost: 0, cpl: 0, color: '#94a3b8' },
+  ];
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
       <div className="flex justify-between items-center">
-        <DateFilter onFilterChange={setRange} />
+        <DateFilter initialRange={persistentRange} onFilterChange={onRangeChange} />
         <div className="flex space-x-2">
-          <button className="px-4 py-2 bg-slate-900 text-white rounded-lg text-sm font-medium hover:bg-slate-800 shadow-sm flex items-center">
-            <span className="mr-2">📥</span> Baixar Relatório
+          <button className="px-4 py-2 bg-slate-900 text-white rounded-lg text-sm font-medium hover:bg-slate-800 shadow-sm flex items-center transition-all hover:shadow-md active:scale-95">
+            <span className="mr-2">📥</span> Exportar Atribuição
           </button>
         </div>
       </div>
@@ -84,42 +99,68 @@ const Dashboard: React.FC = () => {
       {loading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {[1, 2, 3, 4].map(i => (
-            <div key={i} className="bg-white p-6 rounded-xl border border-slate-200 h-24 animate-pulse"></div>
+            <div key={i} className="bg-white p-6 rounded-xl border border-slate-200 h-24 animate-pulse shadow-sm"></div>
           ))}
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          <Metric label="Leads Totais" value="1.240" change={12.5} showCompare={range.compare} previousValue="1.102" />
-          <Metric label="Investimento" value="R$ 45k" change={5.2} showCompare={range.compare} previousValue="R$ 42k" />
-          <Metric label="CPA Médio" value="R$ 36,5" change={-8.4} showCompare={range.compare} previousValue="R$ 39,8" />
-          <Metric label="Taxa de Conv." value="12.8" change={2.1} suffix="%" showCompare={range.compare} previousValue="12.5" />
+          <Metric label="Leads Totais (GTM)" value="1.240" change={12.5} showCompare={persistentRange.compare} previousValue="1.102" />
+          <Metric label="CPL Geral" value="R$ 36,5" change={-8.4} showCompare={persistentRange.compare} previousValue="R$ 39,8" />
+          <Metric label="CAC (Pago)" value="R$ 52,10" change={4.2} showCompare={persistentRange.compare} previousValue="R$ 50,00" />
+          <Metric label="Engajamento (GA4)" value="72.4" change={3.1} suffix="%" showCompare={persistentRange.compare} previousValue="70.2" />
         </div>
       )}
 
-      <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm relative">
-        {loading && (
-          <div className="absolute inset-0 bg-white/50 backdrop-blur-[1px] z-10 flex items-center justify-center rounded-xl">
-             <div className="flex flex-col items-center">
-                <div className="w-8 h-8 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
-                <p className="text-xs font-bold text-slate-500 mt-4 uppercase tracking-widest">Sincronizando Dados...</p>
-             </div>
+      {/* Visão de Atribuição */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2 bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+          <div className="flex justify-between items-center mb-6">
+            <h3 className="text-lg font-bold text-slate-800">Atribuição por Canal</h3>
+            <div className="flex space-x-4">
+              <span className="flex items-center text-[10px] font-bold text-slate-400 uppercase"><span className="w-2 h-2 rounded-full bg-indigo-500 mr-2"></span> Pago</span>
+              <span className="flex items-center text-[10px] font-bold text-slate-400 uppercase"><span className="w-2 h-2 rounded-full bg-emerald-500 mr-2"></span> Orgânico</span>
+            </div>
           </div>
-        )}
-        
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead className="border-b border-slate-100 text-slate-400 font-bold uppercase tracking-wider">
+                <tr>
+                  <th className="pb-3">Canal</th>
+                  <th className="pb-3 text-center">Leads</th>
+                  <th className="pb-3 text-center">Investimento</th>
+                  <th className="pb-3 text-center">CPL / CAC</th>
+                  <th className="pb-3 text-right">Market Share</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-50">
+                {attributionData.map((row, i) => (
+                  <tr key={i} className="group hover:bg-slate-50/50 transition-colors">
+                    <td className="py-4 font-bold flex items-center">
+                      <div className="w-1.5 h-6 rounded-full mr-3" style={{ backgroundColor: row.color }}></div>
+                      {row.channel}
+                    </td>
+                    <td className="py-4 text-center font-medium">{row.leads}</td>
+                    <td className="py-4 text-center text-slate-500">R$ {row.cost.toLocaleString()}</td>
+                    <td className={`py-4 text-center font-bold ${row.cpl > 30 ? 'text-rose-600' : 'text-emerald-600'}`}>R$ {row.cpl}</td>
+                    <td className="py-4 text-right">
+                       <div className="inline-block w-20 bg-slate-100 h-2 rounded-full overflow-hidden">
+                          <div className="h-full rounded-full transition-all duration-700" style={{ backgroundColor: row.color, width: `${(row.leads / 1240) * 100}%` }}></div>
+                       </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <FormPerformance />
+      </div>
+
+      <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
         <div className="flex justify-between items-center mb-6">
           <div>
-            <h3 className="text-lg font-bold text-slate-800">Desempenho no Período</h3>
-            <p className="text-xs text-slate-500">Visualização de tendência e eventos de otimização</p>
-          </div>
-          <div className="flex space-x-6">
-            <div className="flex items-center text-[10px] font-bold text-slate-500 uppercase">
-              <span className="w-2.5 h-2.5 bg-indigo-600 rounded-sm mr-2"></span> Atual
-            </div>
-            {range.compare && (
-              <div className="flex items-center text-[10px] font-bold text-slate-500 uppercase">
-                <span className="w-2.5 h-2.5 bg-slate-300 rounded-sm mr-2"></span> Anterior
-              </div>
-            )}
+            <h3 className="text-lg font-bold text-slate-800">Fluxo Cross-Channel</h3>
+            <p className="text-xs text-slate-500">Comparativo entre Cliques Pagos (Ads) e Impressões Orgânicas (GSC)</p>
           </div>
         </div>
         
@@ -127,84 +168,24 @@ const Dashboard: React.FC = () => {
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={data}>
               <defs>
-                <linearGradient id="colorCurrent" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor={COLORS.primary} stopOpacity={0.1}/>
-                  <stop offset="95%" stopColor={COLORS.primary} stopOpacity={0}/>
+                <linearGradient id="colorPaid" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor={COLORS.paid} stopOpacity={0.1}/>
+                  <stop offset="95%" stopColor={COLORS.paid} stopOpacity={0}/>
+                </linearGradient>
+                <linearGradient id="colorOrganic" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor={COLORS.secondary} stopOpacity={0.1}/>
+                  <stop offset="95%" stopColor={COLORS.secondary} stopOpacity={0}/>
                 </linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-              <XAxis 
-                dataKey="date" 
-                axisLine={false} 
-                tickLine={false} 
-                tick={{fontSize: 10, fill: '#94a3b8'}}
-                dy={10}
-              />
+              <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{fontSize: 10, fill: '#94a3b8'}} dy={10} />
               <YAxis hide />
-              <Tooltip content={<CustomTooltip />} />
-              {range.compare && (
-                <Area 
-                  type="monotone" 
-                  dataKey="conversions_prev" 
-                  name="Período Anterior"
-                  stroke="#cbd5e1" 
-                  strokeWidth={2}
-                  strokeDasharray="5 5"
-                  fill="transparent" 
-                />
-              )}
-              <Area 
-                type="monotone" 
-                dataKey="conversions" 
-                name="Conversões"
-                stroke={COLORS.primary} 
-                strokeWidth={3}
-                fillOpacity={1} 
-                fill="url(#colorCurrent)" 
-              />
+              <Tooltip />
+              <Legend verticalAlign="top" height={36}/>
+              <Area type="monotone" dataKey="clicks" name="Cliques Pagos" stroke={COLORS.paid} strokeWidth={2} fillOpacity={1} fill="url(#colorPaid)" />
+              <Area type="monotone" dataKey="impressions" name="Impressões SEO" stroke={COLORS.secondary} strokeWidth={2} fillOpacity={1} fill="url(#colorOrganic)" />
             </AreaChart>
           </ResponsiveContainer>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-          <h3 className="text-lg font-bold text-slate-800 mb-4">Ações Estratégicas</h3>
-          <div className="space-y-4">
-            {ACTIONS_LOG.slice(0, 4).map((item, idx) => (
-              <div key={idx} className="flex items-start space-x-4 pb-4 border-b border-slate-50 last:border-0 last:pb-0 group">
-                <div className="bg-slate-100 p-2 rounded-lg text-lg group-hover:bg-indigo-50 transition-colors">
-                  {item.category === 'ads' ? '🎯' : item.category === 'seo' ? '🔍' : '📱'}
-                </div>
-                <div>
-                  <p className="text-sm font-semibold text-slate-800">{item.action}</p>
-                  <p className="text-[10px] text-slate-400 font-bold uppercase">{item.date} • {item.provider_name}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-          <h3 className="text-lg font-bold text-slate-800 mb-4">Conversão por Canal</h3>
-          <div className="h-64">
-             <ResponsiveContainer width="100%" height="100%">
-               <BarChart data={[
-                 { name: 'Google', count: 850 },
-                 { name: 'Meta', count: 320 },
-                 { name: 'Direct', count: 120 },
-                 { name: 'SEO', count: 45 },
-               ]}>
-                 <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 10, fontWeight: 'bold', fill: '#64748b'}} />
-                 <Tooltip />
-                 <Bar dataKey="count" radius={[6, 6, 0, 0]} barSize={40}>
-                   { [0,1,2,3].map((entry, index) => (
-                     <Cell key={`cell-${index}`} fill={index === 0 ? COLORS.primary : COLORS.secondary} fillOpacity={0.8} />
-                   ))}
-                 </Bar>
-               </BarChart>
-             </ResponsiveContainer>
-          </div>
         </div>
       </div>
     </div>

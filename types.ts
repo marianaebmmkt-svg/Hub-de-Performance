@@ -7,7 +7,8 @@ export enum ViewType {
   ANALYTICS = 'analytics',
   LEAD_TOOLS = 'tools',
   INSIGHTS = 'insights',
-  ADMIN = 'admin'
+  ADMIN = 'admin',
+  CONNECTIONS = 'connections'
 }
 
 export interface Account {
@@ -43,7 +44,24 @@ export interface PerformanceData {
   clicks_prev: number;
   impressions: number;
   impressions_prev: number;
+  engagement_rate?: number;
   event?: string;
+}
+
+export interface PagePerformance {
+  path: string;
+  title: string;
+  views: number;
+  conversions: number;
+  convRate: number;
+}
+
+export interface FormPerformanceData {
+  id: string;
+  name: string;
+  views: number;
+  submissions: number;
+  convRate: number;
 }
 
 export interface ActionLog {
@@ -59,4 +77,13 @@ export interface User {
   email: string;
   role: 'admin' | 'viewer';
   status: 'active' | 'pending';
+}
+
+export interface ConnectionStatus {
+  provider: string;
+  isConnected: boolean;
+  accessToken?: string;
+  accountId?: string; // Para Google Ads (Customer ID) ou GA4 (Property ID)
+  lastSync?: string;
+  accountName?: string;
 }

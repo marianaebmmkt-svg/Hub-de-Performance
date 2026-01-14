@@ -1,0 +1,7 @@
+{
+  "name": "Hub de Performance da Mari",
+  "description": "Um hub completo de gerenciamento de marketing para a Empresta Bem melhor, integrando insights de Google Ads, Search Console e Analytics com auxílio de IA.",
+  "requestFramePermissions": [
+    "geolocation"
+  ]
+}

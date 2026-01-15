@@ -5,89 +5,144 @@ import { DateRange } from '../types';
 interface DateFilterProps {
   initialRange: DateRange;
   onFilterChange: (range: DateRange) => void;
+  isOpen: boolean;
+  onClose: () => void;
 }
 
-const DateFilter: React.FC<DateFilterProps> = ({ initialRange, onFilterChange }) => {
-  const [isOpen, setIsOpen] = useState(false);
-  const [currentRange, setCurrentRange] = useState<DateRange>(initialRange);
+const DateFilter: React.FC<DateFilterProps> = ({ initialRange, onFilterChange, isOpen, onClose }) => {
+  const [tempRange, setTempRange] = useState<DateRange>(initialRange);
 
-  // Sincroniza estado interno se o inicial mudar (ex: carregando do localStorage)
   useEffect(() => {
-    setCurrentRange(initialRange);
-  }, [initialRange]);
+    if (isOpen) {
+      setTempRange(initialRange);
+    }
+  }, [isOpen, initialRange]);
 
-  const presets = [
-    { label: 'Últimos 7 dias', days: 7 },
-    { label: 'Últimos 30 dias', days: 30 },
-    { label: 'Este mês', isMonth: true },
-    { label: 'Mês passado', isPrevMonth: true },
-    { label: 'Personalizado', custom: true },
-  ];
+  if (!isOpen) return null;
 
-  const handlePresetSelect = (preset: any) => {
-    let start = new Date();
-    let end = new Date();
+  const handleSave = () => {
+    const isValid = (d: any) => d && !isNaN(new Date(d).getTime());
     
-    if (preset.days) {
-      start = new Date(Date.now() - preset.days * 24 * 60 * 60 * 1000);
-    } else if (preset.isMonth) {
-      start = new Date(start.getFullYear(), start.getMonth(), 1);
-    } else if (preset.isPrevMonth) {
-      start = new Date(start.getFullYear(), start.getMonth() - 1, 1);
-      end = new Date(start.getFullYear(), start.getMonth() + 1, 0);
+    if (!isValid(tempRange.start) || !isValid(tempRange.end)) {
+      alert("Por favor, selecione datas válidas para o período principal.");
+      return;
     }
 
-    const newRange = { ...currentRange, label: preset.label, start, end };
-    setCurrentRange(newRange);
-    onFilterChange(newRange);
-    setIsOpen(false);
+    onFilterChange(tempRange);
+    onClose();
   };
 
-  const toggleCompare = () => {
-    const newRange = { ...currentRange, compare: !currentRange.compare };
-    setCurrentRange(newRange);
-    onFilterChange(newRange);
+  const formatDateForInput = (date: any) => {
+    if (!date) return '';
+    const d = new Date(date);
+    if (isNaN(d.getTime())) return '';
+    const year = d.getFullYear();
+    const month = (d.getMonth() + 1).toString().padStart(2, '0');
+    const day = d.getDate().toString().padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  const handleDateChange = (field: 'start' | 'end' | 'compareStart' | 'compareEnd', value: string) => {
+    if (!value) return;
+    const newDate = new Date(value + 'T00:00:00');
+    setTempRange({ ...tempRange, [field]: newDate });
   };
 
   return (
-    <div className="relative inline-block text-left">
-      <div className="flex items-center space-x-2">
-        <button
-          onClick={() => setIsOpen(!isOpen)}
-          className="flex items-center px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm font-medium hover:bg-slate-50 shadow-sm"
-        >
-          <span className="mr-2">📅</span>
-          {currentRange.label}
-          <span className="ml-2 text-[10px] text-slate-400">▼</span>
-        </button>
-        
-        <button 
-          onClick={toggleCompare}
-          className={`flex items-center px-4 py-2 border rounded-lg text-sm font-medium transition-all shadow-sm ${
-            currentRange.compare 
-              ? 'bg-indigo-50 border-indigo-200 text-indigo-700' 
-              : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
-          }`}
-        >
-          {currentRange.compare ? '✅ Comparando' : 'Comparar'}
-        </button>
-      </div>
-
-      {isOpen && (
-        <div className="absolute left-0 mt-2 w-56 rounded-xl shadow-2xl bg-white ring-1 ring-black ring-opacity-5 z-50 overflow-hidden border border-slate-100">
-          <div className="py-1">
-            {presets.map((preset) => (
-              <button
-                key={preset.label}
-                onClick={() => handlePresetSelect(preset)}
-                className="block w-full text-left px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 hover:text-indigo-600 border-b border-slate-50 last:border-0"
-              >
-                {preset.label}
-              </button>
-            ))}
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/40 p-4 animate-in fade-in duration-200">
+      <div className="bg-white w-full max-w-2xl rounded-[40px] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 border border-slate-200">
+        <div className="p-10 border-b border-slate-100 flex justify-between items-center bg-white">
+          <div>
+            <h4 className="text-xl font-black text-slate-900 tracking-tight">Calendário de Performance</h4>
+            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Defina livremente os intervalos de análise</p>
           </div>
+          <button onClick={onClose} className="w-10 h-10 flex items-center justify-center bg-slate-50 rounded-2xl shadow-sm text-slate-400 hover:text-rose-500 transition-all">✕</button>
         </div>
-      )}
+
+        <div className="p-10 space-y-8">
+          {/* Primary Range */}
+          <div className="space-y-4">
+            <h5 className="text-[10px] font-black text-indigo-600 uppercase tracking-widest border-l-4 border-indigo-600 pl-3">Intervalo de Datas Principal</h5>
+            <div className="grid grid-cols-2 gap-6">
+              <div>
+                <label className="block text-[9px] font-black text-slate-500 uppercase mb-2">Início</label>
+                <input 
+                  type="date" 
+                  value={formatDateForInput(tempRange.start)}
+                  onChange={(e) => handleDateChange('start', e.target.value)}
+                  className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-black outline-none focus:ring-4 focus:ring-indigo-500/10"
+                />
+              </div>
+              <div>
+                <label className="block text-[9px] font-black text-slate-500 uppercase mb-2">Fim</label>
+                <input 
+                  type="date" 
+                  value={formatDateForInput(tempRange.end)}
+                  onChange={(e) => handleDateChange('end', e.target.value)}
+                  className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-black outline-none focus:ring-4 focus:ring-indigo-500/10"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Comparison Toggle */}
+          <div className="flex items-center justify-between p-6 bg-indigo-50/50 rounded-3xl border border-indigo-100">
+            <div>
+              <p className="text-[11px] font-black text-slate-900 uppercase">Habilitar Comparação</p>
+              <p className="text-[9px] text-indigo-600 font-bold uppercase tracking-tight">Visualizar dados sobrepostos nos gráficos</p>
+            </div>
+            <button 
+              onClick={() => {
+                const isComparing = !tempRange.compare;
+                const newCompareRange = isComparing ? {
+                  compareStart: tempRange.compareStart || new Date(new Date(tempRange.start).setDate(new Date(tempRange.start).getDate() - 30)),
+                  compareEnd: tempRange.compareEnd || new Date(new Date(tempRange.end).setDate(new Date(tempRange.end).getDate() - 30)),
+                } : {};
+                setTempRange({ ...tempRange, compare: isComparing, ...newCompareRange });
+              }}
+              className={`w-14 h-8 rounded-full p-1 transition-all duration-300 ${tempRange.compare ? 'bg-indigo-600' : 'bg-slate-300'}`}
+            >
+              <div className={`w-6 h-6 bg-white rounded-full shadow-md transition-all duration-300 ${tempRange.compare ? 'translate-x-6' : 'translate-x-0'}`}></div>
+            </button>
+          </div>
+
+          {/* Comparison Range */}
+          {tempRange.compare && (
+            <div className="space-y-4 animate-in slide-in-from-top-4 duration-200">
+              <h5 className="text-[10px] font-black text-emerald-600 uppercase tracking-widest border-l-4 border-emerald-500 pl-3">Período de Comparação</h5>
+              <div className="grid grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-[9px] font-black text-slate-500 uppercase mb-2">Início (Comparativo)</label>
+                  <input 
+                    type="date" 
+                    value={formatDateForInput(tempRange.compareStart)}
+                    onChange={(e) => handleDateChange('compareStart', e.target.value)}
+                    className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-black outline-none focus:ring-4 focus:ring-emerald-500/10"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[9px] font-black text-slate-500 uppercase mb-2">Fim (Comparativo)</label>
+                  <input 
+                    type="date" 
+                    value={formatDateForInput(tempRange.compareEnd)}
+                    onChange={(e) => handleDateChange('compareEnd', e.target.value)}
+                    className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-black outline-none focus:ring-4 focus:ring-emerald-500/10"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="p-10 bg-slate-50 border-t border-slate-100">
+          <button 
+            onClick={handleSave}
+            className="w-full py-5 bg-slate-900 text-white rounded-[32px] font-black text-[10px] uppercase tracking-widest shadow-2xl hover:bg-indigo-600 transition-all"
+          >
+            Sincronizar BI com novas datas
+          </button>
+        </div>
+      </div>
     </div>
   );
 };

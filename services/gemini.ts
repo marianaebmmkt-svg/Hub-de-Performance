@@ -5,14 +5,14 @@ import { MOCK_PERFORMANCE, ACTIONS_LOG } from "../constants";
 export const getChatResponse = async (userMessage: string, history: any[]) => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   
-  // Prepara o contexto de dados para a IA
   const dataContext = {
     performance: MOCK_PERFORMANCE,
     actions: ACTIONS_LOG,
-    client: "Hub de Performance da Mari"
+    client: "Hub de Performance",
+    year: 2026,
+    today: "2026-01-15"
   };
 
-  // Upgraded to gemini-3-pro-preview for complex strategic analysis as per guidelines
   const response = await ai.models.generateContent({
     model: "gemini-3-pro-preview",
     contents: [
@@ -20,25 +20,25 @@ export const getChatResponse = async (userMessage: string, history: any[]) => {
       { role: "user", parts: [{ text: userMessage }] }
     ],
     config: {
-      systemInstruction: `Você é a IA Analista Estratégica do 'Hub de Performance da Mari'. 
-      Seu tom é profissional, direto e focado em resultados de marketing digital.
-      Você tem acesso a estes dados: ${JSON.stringify(dataContext)}.
-      Ao analisar, cite métricas específicas como CPA, Conversões e Investimento. 
-      Ajude o gestor a tomar decisões baseadas nos dados fornecidos.`,
+      systemInstruction: `Você é o Agente Estratégico do 'Hub de Performance'. 
+      Contexto Atual: Hoje é 15 de Janeiro de 2026. 
+      Seu tom deve ser executivo, focado em ROI e ROAS.
+      Você analisa dados de Google Ads, Meta Ads e GA4.
+      Dados Atuais: ${JSON.stringify(dataContext)}.
+      Ao sugerir ações, use o ano de 2026 como base e projete tendências para o próximo trimestre.`,
     },
   });
 
   return response.text;
 };
 
-export const getMarketInsights = async (niche: string = "empréstimo consignado e crédito no Brasil") => {
+export const getMarketInsights = async (niche: string = "empréstimo consignado e crédito no Brasil em 2026") => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   try {
-    // Upgraded to gemini-3-pro-preview for advanced reasoning and market analysis
     const response = await ai.models.generateContent({
       model: "gemini-3-pro-preview",
-      contents: `Analise as tendências atuais de marketing digital para o nicho de ${niche} para o 'Hub de Performance da Mari'. 
-      Foque em CPC médio e volume de busca atual.`,
+      contents: `Analise as tendências atuais de marketing digital para o nicho de ${niche} para o 'Hub de Performance'. 
+      Foque no cenário de 2026: regulamentação, taxas e comportamento do consumidor digital.`,
       config: {
         tools: [{ googleSearch: {} }],
       },
@@ -50,6 +50,6 @@ export const getMarketInsights = async (niche: string = "empréstimo consignado 
     };
   } catch (error) {
     console.error("Error fetching Gemini insights:", error);
-    return { text: "Erro ao carregar insights de mercado.", sources: [] };
+    return { text: "Erro ao carregar insights de mercado para 2026.", sources: [] };
   }
 };

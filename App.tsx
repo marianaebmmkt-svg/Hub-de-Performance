@@ -1,122 +1,99 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import Layout from './components/Layout';
 import Dashboard from './components/Dashboard';
 import InsightsSection from './components/InsightsSection';
-import Tools from './components/Tools';
 import AIChatSidebar from './components/AIChatSidebar';
-import AdminManagement from './components/AdminManagement';
 import ConnectionsManager from './components/ConnectionsManager';
-import { ViewType, Account, ConnectionStatus, DateRange } from './types';
-import { MOCK_ACCOUNTS } from './constants';
+import { ViewType, ConnectionStatus, DateRange, PerformanceData } from './types';
 import { useLocalStorage } from './hooks/useLocalStorage';
 
 const App: React.FC = () => {
   const [activeView, setActiveView] = useState<ViewType>(ViewType.DASHBOARD);
-  const [selectedAccount, setSelectedAccount] = useState<Account>(MOCK_ACCOUNTS[0]);
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
 
-  // Detecção de chaves de ambiente
   const env = (import.meta as any).env;
   const hasAdsKey = !!(env?.VITE_GOOGLE_ADS_ACCESS_TOKEN || process.env?.VITE_GOOGLE_ADS_ACCESS_TOKEN);
   const hasGA4Key = !!(env?.VITE_GA4_ACCESS_TOKEN || process.env?.VITE_GA4_ACCESS_TOKEN);
 
   const [connections, setConnections] = useLocalStorage<ConnectionStatus[]>('mari_hub_connections', [
-    { provider: 'google_ads', isConnected: hasAdsKey },
-    { provider: 'meta_ads', isConnected: false },
-    { provider: 'ga4', isConnected: hasGA4Key },
-    { provider: 'gsc', isConnected: false },
+    { provider: 'google_ads', isConnected: hasAdsKey, type: 'oauth' },
+    { provider: 'meta_ads', isConnected: false, type: 'oauth' },
+    { provider: 'ga4', isConnected: hasGA4Key, type: 'oauth' },
+    { provider: 'gsc', isConnected: false, type: 'oauth' },
   ]);
 
+  // Busca a última data disponível nos dados para definir o range inicial
+  const lastDataDate = useMemo(() => {
+    const stored = localStorage.getItem('consolidated_performance_db');
+    if (stored) {
+      const data: PerformanceData[] = JSON.parse(stored);
+      if (data.length > 0) {
+        const dates = data.map(d => new Date(d.date).getTime());
+        return new Date(Math.max(...dates));
+      }
+    }
+    return new Date(2026, 0, 15); // Fallback padrão caso não haja dados
+  }, []);
+
+  const defaultStart = new Date(lastDataDate.getFullYear(), lastDataDate.getMonth(), 1);
+  const defaultEnd = lastDataDate;
+
   const [persistentRange, setPersistentRange] = useLocalStorage<DateRange>('mari_hub_daterange', {
-    label: 'Últimos 7 dias',
-    start: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
-    end: new Date(),
+    label: 'Intervalo Personalizado',
+    start: defaultStart,
+    end: defaultEnd,
     compare: false
   });
 
   useEffect(() => {
     setIsSyncing(true);
-    const timer = setTimeout(() => setIsSyncing(false), 800);
+    const timer = setTimeout(() => setIsSyncing(false), 600);
     return () => clearTimeout(timer);
-  }, [connections, persistentRange, activeView]);
+  }, [activeView, persistentRange]);
 
-  const handleConnect = (providerId: string, accessToken: string, accountId?: string) => {
+  const handleConnect = (providerId: string, accessToken: string, accountId?: string, webhookUrl?: string) => {
     setConnections(prev => prev.map(c => 
-      c.provider === providerId 
-        ? { 
-            ...c, 
-            isConnected: true, 
-            accessToken, 
-            accountId,
-            lastSync: new Date().toLocaleString('pt-BR') 
-          } 
-        : c
+      c.provider === providerId ? { ...c, isConnected: true, accessToken, accountId, webhookUrl, lastSync: new Date().toLocaleString() } : c
     ));
-    setActiveView(ViewType.DASHBOARD);
   };
 
   const handleDisconnect = (providerId: string) => {
-    if (window.confirm(`Deseja desconectar a conta do ${providerId}?`)) {
-      setConnections(prev => prev.map(c => 
-        c.provider === providerId ? { ...c, isConnected: false, accessToken: undefined, accountId: undefined, lastSync: undefined } : c
-      ));
-    }
-  };
-
-  const handleLogout = () => {
-    if (window.confirm("Deseja limpar todos os dados de conexão?")) {
-      localStorage.removeItem('mari_hub_connections');
-      window.location.reload();
-    }
+    setConnections(prev => prev.map(c => 
+      c.provider === providerId ? { ...c, isConnected: false, accessToken: undefined } : c
+    ));
   };
 
   const renderContent = () => {
     switch (activeView) {
       case ViewType.DASHBOARD:
-        return (
-          <Dashboard 
-            persistentRange={persistentRange} 
-            onRangeChange={setPersistentRange} 
-            onViewChange={setActiveView}
-          />
-        );
+        return <Dashboard persistentRange={persistentRange} onRangeChange={setPersistentRange} viewType={ViewType.DASHBOARD} />;
+      case ViewType.GOOGLE_ADS:
+        return <Dashboard persistentRange={persistentRange} onRangeChange={setPersistentRange} viewType={ViewType.GOOGLE_ADS} />;
+      case ViewType.META_ADS:
+        return <Dashboard persistentRange={persistentRange} onRangeChange={setPersistentRange} viewType={ViewType.META_ADS} />;
       case ViewType.INSIGHTS:
         return <InsightsSection />;
-      case ViewType.LEAD_TOOLS:
-        return <Tools />;
-      case ViewType.ADMIN:
-        return <AdminManagement />;
       case ViewType.CONNECTIONS:
-        return (
-          <ConnectionsManager 
-            connections={connections}
-            onConnect={handleConnect}
-            onDisconnect={handleDisconnect}
-          />
-        );
+        return <ConnectionsManager connections={connections} onConnect={handleConnect} onDisconnect={handleDisconnect} />;
       default:
-        return <Dashboard persistentRange={persistentRange} onRangeChange={setPersistentRange} onViewChange={setActiveView} />;
+        return <Dashboard persistentRange={persistentRange} onRangeChange={setPersistentRange} viewType={ViewType.DASHBOARD} />;
     }
   };
 
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-slate-50 font-inter">
-      <div className={`fixed top-4 right-4 z-[60] px-4 py-2 rounded-full text-[10px] font-bold uppercase tracking-widest transition-all duration-500 shadow-xl border ${
-        isSyncing 
-          ? 'bg-indigo-600 border-indigo-400 text-white scale-110' 
-          : 'bg-emerald-500 border-emerald-400 text-white opacity-0 scale-90 translate-y-[-20px]'
+      <div className={`fixed top-4 right-4 z-[60] px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-all duration-500 shadow-xl border ${
+        isSyncing ? 'bg-indigo-600 border-indigo-400 text-white scale-110' : 'bg-emerald-500 border-emerald-400 text-white opacity-0 scale-90 translate-y-[-20px]'
       }`}>
-        {isSyncing ? '⌛ Sincronizando...' : '✅ Conectado'}
+        {isSyncing ? '⌛ Sincronizando BI...' : '✅ Online 2026'}
       </div>
 
       <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
         <Layout 
           activeView={activeView} 
           onViewChange={setActiveView}
-          selectedAccount={selectedAccount}
-          onAccountChange={setSelectedAccount}
           onToggleChat={() => setIsChatOpen(!isChatOpen)}
         >
           {renderContent()}
@@ -124,23 +101,10 @@ const App: React.FC = () => {
       </div>
       
       {isChatOpen && (
-        <div className="w-[320px] shrink-0 h-full z-20">
-          <AIChatSidebar 
-            onClose={() => setIsChatOpen(false)} 
-            currentRange={persistentRange}
-          />
+        <div className="w-[350px] shrink-0 h-full z-20 animate-in slide-in-from-right duration-300">
+          <AIChatSidebar onClose={() => setIsChatOpen(false)} currentRange={persistentRange} />
         </div>
       )}
-
-      <button 
-        onClick={handleLogout}
-        className="fixed bottom-4 left-4 z-50 p-2 bg-slate-800 text-slate-400 rounded-full hover:text-rose-500 hover:bg-slate-700 transition-all opacity-20 hover:opacity-100"
-        title="Limpar Conexões"
-      >
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-        </svg>
-      </button>
     </div>
   );
 };

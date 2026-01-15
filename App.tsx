@@ -16,11 +16,11 @@ const App: React.FC = () => {
   const [selectedAccount, setSelectedAccount] = useState<Account>(MOCK_ACCOUNTS[0]);
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
-  
-  // Detecção robusta de chaves de Service Account (Vite env ou Process env)
-  // Added cast to any for import.meta to resolve Property 'env' does not exist error
-  const hasAdsKey = !!((import.meta as any).env?.VITE_GOOGLE_ADS_ACCESS_TOKEN || process.env?.VITE_GOOGLE_ADS_ACCESS_TOKEN);
-  const hasGA4Key = !!((import.meta as any).env?.VITE_GA4_ACCESS_TOKEN || process.env?.VITE_GA4_ACCESS_TOKEN);
+
+  // Detecção de chaves de ambiente
+  const env = (import.meta as any).env;
+  const hasAdsKey = !!(env?.VITE_GOOGLE_ADS_ACCESS_TOKEN || process.env?.VITE_GOOGLE_ADS_ACCESS_TOKEN);
+  const hasGA4Key = !!(env?.VITE_GA4_ACCESS_TOKEN || process.env?.VITE_GA4_ACCESS_TOKEN);
 
   const [connections, setConnections] = useLocalStorage<ConnectionStatus[]>('mari_hub_connections', [
     { provider: 'google_ads', isConnected: hasAdsKey },
@@ -58,7 +58,7 @@ const App: React.FC = () => {
   };
 
   const handleDisconnect = (providerId: string) => {
-    if (window.confirm(`Deseja interromper a sincronização Cloud do ${providerId}?`)) {
+    if (window.confirm(`Deseja desconectar a conta do ${providerId}?`)) {
       setConnections(prev => prev.map(c => 
         c.provider === providerId ? { ...c, isConnected: false, accessToken: undefined, accountId: undefined, lastSync: undefined } : c
       ));
@@ -66,7 +66,7 @@ const App: React.FC = () => {
   };
 
   const handleLogout = () => {
-    if (window.confirm("Deseja realmente sair e limpar os dados da sessão?")) {
+    if (window.confirm("Deseja limpar todos os dados de conexão?")) {
       localStorage.removeItem('mari_hub_connections');
       window.location.reload();
     }
@@ -103,10 +103,12 @@ const App: React.FC = () => {
 
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-slate-50 font-inter">
-      <div className={`fixed top-4 right-4 z-[60] px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest transition-all duration-500 shadow-lg ${
-        isSyncing ? 'bg-indigo-600 text-white scale-110' : 'bg-emerald-500 text-white opacity-0 scale-90 translate-y-[-20px]'
+      <div className={`fixed top-4 right-4 z-[60] px-4 py-2 rounded-full text-[10px] font-bold uppercase tracking-widest transition-all duration-500 shadow-xl border ${
+        isSyncing 
+          ? 'bg-indigo-600 border-indigo-400 text-white scale-110' 
+          : 'bg-emerald-500 border-emerald-400 text-white opacity-0 scale-90 translate-y-[-20px]'
       }`}>
-        {isSyncing ? '☁️ Cloud Sync Active...' : '✅ Online'}
+        {isSyncing ? '⌛ Sincronizando...' : '✅ Conectado'}
       </div>
 
       <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
@@ -133,10 +135,10 @@ const App: React.FC = () => {
       <button 
         onClick={handleLogout}
         className="fixed bottom-4 left-4 z-50 p-2 bg-slate-800 text-slate-400 rounded-full hover:text-rose-500 hover:bg-slate-700 transition-all opacity-20 hover:opacity-100"
-        title="Limpar Sessão"
+        title="Limpar Conexões"
       >
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
         </svg>
       </button>
     </div>
